@@ -102,7 +102,6 @@ def finally_threads_sitemap(site):
                                    date_for_bd)
 
     if len(id_domain_from_date['rows']) < 1:
-
         sitemap_url = sites[site]
         sitemap_obj = Sitemap()
         sitemaps_urls = sitemap_obj.get_xml_and_url(sitemap_url)
@@ -114,10 +113,13 @@ def finally_threads_sitemap(site):
         """
 
         id_domain = db.fetch("SELECT id FROM sitemap_count WHERE domain = %s LIMIT 1", site)
-
         if not id_domain['rows']:
             id_domain_desc = db.fetch("select id from sitemap_count ORDER BY id DESC LIMIT 1")
-            id_domain_desc = int(id_domain_desc['rows'][0][0]) + 1
+            if not id_domain_desc['rows']:
+                id_domain_desc = 0
+            else:
+                id_domain_desc = int(id_domain_desc['rows'][0][0]) + 1
+
             db.commit("INSERT INTO sitemap_count (id, domain, count, date) VALUES (%s, %s, %s, %s)", id_domain_desc,
                       site,
                       count_sitemaps, date_for_bd)
@@ -155,12 +157,24 @@ def finally_threads_sitemap(site):
 
 
 def main():
-    if len(sites) >= 1:
-        threads = len(sites) // 5
-        if threads >= 15:
-            threads = 10
-        elif threads <= 0:
-            threads = 1
+    db = MySQLi(host, user, password, database_home)
+    check_list_domains_in_bd = []
+    for site in sites:
+        id_domain = db.fetch("SELECT id FROM sitemap_count WHERE domain = %s LIMIT 1", site)
+        if not id_domain['rows']:
+            check_list_domains_in_bd.append(site)
+    if len(check_list_domains_in_bd) == 0:
+        if len(sites) >= 1:
+            threads = len(sites) // 5
+            if threads >= 15:
+                threads = 10
+            elif threads <= 0:
+                threads = 1
+            print(f"Количество потоков: {threads}")
+            with Pool(threads) as p:
+                p.map(finally_threads_sitemap, sites)
+    else:
+        threads = 1
         print(f"Количество потоков: {threads}")
         with Pool(threads) as p:
             p.map(finally_threads_sitemap, sites)
